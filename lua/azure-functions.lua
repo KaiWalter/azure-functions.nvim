@@ -4,7 +4,18 @@ local M = {
   job_id = nil,
 }
 
+P = function(v)
+  print(vim.inspect(v))
+  return v
+end
+
+local default_opts = {
+  compress_log = true,
+}
+
 M.setup = function(opts)
+  M.config = vim.tbl_deep_extend("force", default_opts, opts)
+
   vim.api.nvim_create_user_command('FuncRun', M.start, {})
 end
 
@@ -26,10 +37,20 @@ end
 
 local function log(_, data)
   if data and M.buffer_number then
+    local output_lines = {}
+    for _, v in pairs(data) do
+      if M.config.compress_log then
+        if v ~= '' then
+          table.insert(output_lines, v)
+        end
+      else
+        table.insert(output_lines, v)
+      end
+    end
     vim.api.nvim_buf_set_option(M.buffer_number, "modifiable", true)
-    vim.api.nvim_buf_set_lines(M.buffer_number, -1, -1, true, data)
-    scroll_to_end(M.buffer_number)
+    vim.api.nvim_buf_set_lines(M.buffer_number, -1, -1, true, output_lines)
     vim.api.nvim_buf_set_option(M.buffer_number, "modifiable", false)
+    scroll_to_end(M.buffer_number)
   end
 end
 
