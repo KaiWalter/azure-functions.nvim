@@ -17,6 +17,7 @@ M.setup = function(opts)
   M.config = vim.tbl_deep_extend("force", default_opts, opts)
 
   vim.api.nvim_create_user_command('FuncRun', M.start, {})
+  vim.api.nvim_create_user_command('FuncDebug', M.start_with_debug, {})
 end
 
 local function scroll_to_end(bufnr)
@@ -63,14 +64,19 @@ M.open_logging = function()
     M.window_number = vim.api.nvim_get_current_win()
     vim.api.nvim_command('enew!')
     M.buffer_number = vim.api.nvim_get_current_buf()
-    vim.api.nvim_create_autocmd({ "BufLeave", "BufWinLeave" }, {
+    vim.api.nvim_create_autocmd({ 'WinClosed' }, {
+      group = vim.api.nvim_create_augroup('Azure-Functions', { clear = true }),
       buffer = M.buffer_number,
-      callback = M.close_logging
+      callback = function(ev)
+        -- print(vim.inspect(ev))
+        M.close_logging()
+      end
     })
   end
 end
 
 M.close_logging = function()
+  -- print(M.job_id, M.window_number, M.buffer_number)
   if M.job_id then
     vim.fn.jobstop(M.job_id)
     M.job_id = nil
@@ -83,6 +89,7 @@ M.close_logging = function()
     vim.api.nvim_buf_delete(M.buffer_number, { force = true })
     M.buffer_number = nil
   end
+  return true
 end
 
 M.start_logging = function()
@@ -99,6 +106,15 @@ end
 M.start = function()
   M.start_logging()
   M.job_id = vim.fn.jobstart({ 'func', 'host', 'start' }, {
+    on_stdout = log,
+    on_stderr = log,
+    on_exit = M.exit_job
+  })
+end
+
+M.start_with_debug = function()
+  M.start_logging()
+  M.job_id = vim.fn.jobstart({ 'func', 'host', 'start', '--dotnet-isolated-debug' }, {
     on_stdout = log,
     on_stderr = log,
     on_exit = M.exit_job
