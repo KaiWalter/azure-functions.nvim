@@ -2,6 +2,7 @@ local M = {
   buffer_number = nil,
   window_number = nil,
   job_id = nil,
+  process_id = nil,
 }
 
 P = function(v)
@@ -36,10 +37,15 @@ local function scroll_to_end(bufnr)
   vim.api.nvim_set_current_win(cur_win)
 end
 
+M.get_process_id = function()
+  return M.process_id
+end
+
 local function log(_, data)
   if data and M.buffer_number then
     local output_lines = {}
     for _, v in pairs(data) do
+      M.process_id = tonumber(v:match('PID: ([0-9]+)'))
       if M.config.compress_log then
         if v ~= '' then
           table.insert(output_lines, v)
@@ -68,7 +74,6 @@ M.open_logging = function()
       group = vim.api.nvim_create_augroup('Azure-Functions', { clear = true }),
       buffer = M.buffer_number,
       callback = function(ev)
-        -- print(vim.inspect(ev))
         M.close_logging()
       end
     })
@@ -113,6 +118,7 @@ M.start = function()
 end
 
 M.start_with_debug = function()
+  M.process_id = nil
   M.start_logging()
   M.job_id = vim.fn.jobstart({ 'func', 'host', 'start', '--dotnet-isolated-debug' }, {
     on_stdout = log,
