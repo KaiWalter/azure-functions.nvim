@@ -1,25 +1,13 @@
 local M = {
-  buffer_number = nil,
-  window_number = nil,
-  job_id = nil,
-  process_id = nil,
+  buffer_number = nil, -- maintain ID of buffer for Function Host Log
+  window_number = nil, -- maintain ID of window for Function Host Log
+  job_id = nil,        -- maintain ID of job that has been started for Function Host
+  process_id = nil,    -- maintain ID of dotnet isolated process extracted from log
 }
-
-P = function(v)
-  print(vim.inspect(v))
-  return v
-end
 
 local default_opts = {
   compress_log = true,
 }
-
-M.setup = function(opts)
-  M.config = vim.tbl_deep_extend("force", default_opts, opts)
-
-  vim.api.nvim_create_user_command('FuncRun', M.start, {})
-  vim.api.nvim_create_user_command('FuncDebug', M.start_with_debug, {})
-end
 
 local function scroll_to_end(bufnr)
   local cur_win = vim.api.nvim_get_current_win()
@@ -37,15 +25,29 @@ local function scroll_to_end(bufnr)
   vim.api.nvim_set_current_win(cur_win)
 end
 
-M.get_process_id = function()
-  return M.process_id
+local start_debugger = function(process_id)
+  require('dap').run({
+      type = "coreclr",
+      name = "attach Azure Function",
+      request = "attach",
+      processId = process_id,
+    },
+    {
+      filetype = "cs",
+      new = true,
+    })
 end
 
-local function log(_, data)
+local log = function(_, data)
   if data and M.buffer_number then
     local output_lines = {}
     for _, v in pairs(data) do
-      M.process_id = tonumber(v:match('PID: ([0-9]+)'))
+      local process_id = tonumber(v:match('PID: ([0-9]+)'))
+      if process_id then
+        M.process_id = process_id
+        start_debugger(process_id)
+      end
+
       if M.config.compress_log then
         if v ~= '' then
           table.insert(output_lines, v)
@@ -57,11 +59,12 @@ local function log(_, data)
     vim.api.nvim_buf_set_option(M.buffer_number, "modifiable", true)
     vim.api.nvim_buf_set_lines(M.buffer_number, -1, -1, true, output_lines)
     vim.api.nvim_buf_set_option(M.buffer_number, "modifiable", false)
-    scroll_to_end(M.buffer_number)
+    -- scroll_to_end(M.buffer_number)
   end
 end
 
 M.open_logging = function()
+  local cur_win = vim.api.nvim_get_current_win()
   if not M.window_number then
     M.buffer_number = nil
   end
@@ -78,29 +81,50 @@ M.open_logging = function()
       end
     })
   end
+  vim.api.nvim_set_current_win(cur_win)
 end
 
 M.close_logging = function()
-  -- print(M.job_id, M.window_number, M.buffer_number)
   if M.job_id then
     vim.fn.jobstop(M.job_id)
     M.job_id = nil
   end
+
   if M.window_number then
     vim.api.nvim_win_close(M.window_number, true)
     M.window_number = nil
   end
+
   if M.buffer_number then
     vim.api.nvim_buf_delete(M.buffer_number, { force = true })
     M.buffer_number = nil
   end
+
   return true
 end
 
 M.start_logging = function()
+  M.process_id = nil
   M.open_logging()
   vim.api.nvim_buf_set_lines(M.buffer_number, 0, -1, true, {})
   vim.api.nvim_buf_set_option(M.buffer_number, "modifiable", false)
+end
+
+-- ------------------------------------------------------
+M.setup = function(opts)
+  M.config = vim.tbl_deep_extend("force", default_opts, opts)
+
+  vim.api.nvim_create_user_command('FuncRun', M.start_without_debug, {})
+  vim.api.nvim_create_user_command('FuncDebug', M.start_with_debug, {})
+  vim.api.nvim_create_user_command('FuncStop', M.stop, {})
+end
+
+M.get_process_id = function()
+  return M.process_id
+end
+
+M.stop = function()
+  M.close_logging()
 end
 
 M.exit_job = function()
@@ -108,7 +132,7 @@ M.exit_job = function()
   M.close_logging()
 end
 
-M.start = function()
+M.start_without_debug = function()
   M.start_logging()
   M.job_id = vim.fn.jobstart({ 'func', 'host', 'start' }, {
     on_stdout = log,
@@ -118,7 +142,6 @@ M.start = function()
 end
 
 M.start_with_debug = function()
-  M.process_id = nil
   M.start_logging()
   M.job_id = vim.fn.jobstart({ 'func', 'host', 'start', '--dotnet-isolated-debug' }, {
     on_stdout = log,
