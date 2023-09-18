@@ -9,20 +9,22 @@ local default_opts = {
   compress_log = true,
 }
 
-local function scroll_to_end(bufnr)
-  local cur_win = vim.api.nvim_get_current_win()
+M.scroll_to_end = function()
+  if M.buffer_number then
+    local cur_win = vim.api.nvim_get_current_win()
 
-  -- switch to buf and set cursor
-  vim.api.nvim_buf_call(bufnr, function()
-    local target_win = vim.api.nvim_get_current_win()
-    vim.api.nvim_set_current_win(target_win)
+    -- switch to buf and set cursor
+    vim.api.nvim_buf_call(M.buffer_number, function()
+      local target_win = vim.api.nvim_get_current_win()
+      vim.api.nvim_set_current_win(target_win)
 
-    local target_line = vim.tbl_count(vim.api.nvim_buf_get_lines(0, 0, -1, true))
-    vim.api.nvim_win_set_cursor(target_win, { target_line, 0 })
-  end)
+      local target_line = vim.tbl_count(vim.api.nvim_buf_get_lines(0, 0, -1, true))
+      vim.api.nvim_win_set_cursor(target_win, { target_line, 0 })
+    end)
 
-  -- return to original window
-  vim.api.nvim_set_current_win(cur_win)
+    -- return to original window
+    vim.api.nvim_set_current_win(cur_win)
+  end
 end
 
 local start_debugger = function(process_id)
@@ -117,6 +119,7 @@ M.setup = function(opts)
   vim.api.nvim_create_user_command('FuncRun', M.start_without_debug, {})
   vim.api.nvim_create_user_command('FuncDebug', M.start_with_debug, {})
   vim.api.nvim_create_user_command('FuncStop', M.stop, {})
+  vim.api.nvim_create_user_command('FuncShowLog', M.scroll_to_end, {})
 end
 
 M.get_process_id = function()
