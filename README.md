@@ -10,6 +10,19 @@ Experimental NeoVim LUA Plugin to handle Azure Functions local development.
 - [DAP](https://github.com/mfussenegger/nvim-dap)
 - [Azure Functions Core Tools](https://github.com/Azure/azure-functions-core-tools)
 
+## Install with Lazy
+
+```lua
+    {
+      "kaiwalter/azure-functions.nvim",
+      config = function()
+        require("azure-functions").setup({
+          compress_log = true,
+        })
+      end,
+    }
+```
+
 ## Install with Packer
 
 ```lua
