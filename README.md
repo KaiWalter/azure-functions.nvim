@@ -23,6 +23,21 @@ Experimental NeoVim LUA Plugin to handle Azure Functions local development.
     }
 ```
 
+or for local development version e.g. in folder `~/src/azure-functions.nvim`
+
+```lua
+    {
+      "KaiWalter/azure-functions.nvim",
+      dir = "~/src/azure-functions.nvim",
+      dev = true,
+      config = function()
+        require("azure-functions").setup({
+          compress_log = true,
+        })
+      end,
+    }
+```
+
 ## Install with Packer
 
 ```lua
